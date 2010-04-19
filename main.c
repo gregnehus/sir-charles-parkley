@@ -35,16 +35,28 @@ const tMotor motorB = (tMotor) motorB; //tmotorNxtEncoderClosedLoop //*!!!!*//
 #define MOTOR_A_SPEED -15
 #define MOTOR_B_SPEED 75
 
+#define track 4.625
+#define wheelbase 7.25
+#define steeringangle 40
+#define WHEEL_DIAMETER 5.5
+#define turning_radius 14.56
+
 /**********************************************************************************
 * Function prototypes
 *********************************************************************************/
 void set_steering_angle(int angle);
 void halt();
-
+void park(float deltaX, float deltaY);
+float getTurningRadius();
+float inches_to_centimeters(float inches);
+void drive(float distance);
+float get_angle_between_circles(float deltaX, float deltaY);
+float get_distance(float deltaX, float deltaY);
+float get_needed_park_y_coordinate(float deltaX);
 /**********************************************************************************
 * Global variables for steering motor
 *********************************************************************************/
-int steeringAngle = 45; //this assumes initial steering angle is straight
+int steeringAngle = 0; //this assumes initial steering angle is straight
 
 /**********************************************************************************
 * Global variables for PID controller
@@ -156,6 +168,70 @@ void Arbiter(int nAngle)
 	return;
 }
 
+void park(float deltaX, float deltaY){
+   float currentTurningCircleOrigin_X,currentTurningCircleOrigin_Y;
+   float parkedTurningCircleOrigin_X, parkedTurningCircleOrigin_Y;
+
+   currentTurningCircleOrigin_X = turning_radius - track/2;
+   currentTurningCircleOrigin_Y = 0;
+
+   parkedTurningCircleOrigin_X = deltaX - getTurningRadius + track/2;
+   currentTurningCircleOrigin_Y = deltaY;
+
+   float circleDeltaX = parkedTurningCircleOrigin_X - currentTurningCircleOrigin_X;
+   float nX = get_needed_park_y_coordinate(circleDeltaX);
+   //double nCarx = nX
+   nxtDisplayCenteredTextLine(4, "needed dX=%f", nX);
+   //while(1);
+   drive(inches_to_centimeters(nX - deltaY));
+   set_steering_angle(45);
+   set_steering_angle(0);
+
+   //float turningRadius = getTurningRadius();
+   //nxtDisplayCenteredTextLine(4, "radius=%d", turningRadius);
+   while(1);
+
+   drive(-turning_radius * get_angle_between_circles(circleDeltaX, deltaY));
+
+   set_steering_angle(-45);
+   drive(- turning_radius * (PI - get_angle_between_circles(circleDeltaX, deltaY)));
+   //drive(- turning_radius * get_angle_between_circles(deltaX, deltaY));
+
+}
+
+float get_angle_between_circles(float deltaX, float deltaY){
+
+  return 2.0 * atan((sqrt((deltaX * deltaX) + (deltaY * deltaY)) - deltaX)/ deltaY);
+}
+float getTurningRadius(){
+  return track/2.0 + wheelbase / sinDegrees(steeringAngle);
+
+}
+
+void drive(float distance){
+
+  nMotorEncoder[motorA] = 0;
+  motor[motorA] = -1 * (abs(distance)/distance) * 40;
+
+  while (abs(nMotorEncoder[motorA]) < (long)abs(distance / (PI * WHEEL_DIAMETER) * 360.00));
+  motor[motorA] = 0;
+  wait10Msec(10);
+
+
+}
+float get_distance(float deltaX, float deltaY){
+    return sqrt( deltaX * deltaX + deltaY * deltaY);
+}
+
+float get_needed_park_y_coordinate(float deltaX){
+  float distance = ((turning_radius) - track) * ((turning_radius ) - track);
+   return sqrt( distance   - (deltaX * deltaX));
+}
+
+float inches_to_centimeters(float inches){
+  return inches * 2.54;
+}
+
 /********************************************************************************
  * Function: void halt()
  * Parameters: None
@@ -179,7 +255,7 @@ void set_steering_angle(int angle)
 {
   int direction = 1;
 
-  nxtDisplayCenteredBigTextLine(4, "angle=%d", angle);
+  //nxtDisplayCenteredBigTextLine(4, "angle=%d", angle);
 
   // base case
   if(angle == steeringAngle) return;
@@ -209,12 +285,14 @@ task main()
 	eraseDisplay();
 
 	// Start Light sensors
-	StartTask(tLightSensor);
-	wait1Msec(1000);
+	//StartTask(tLightSensor);
+	//wait1Msec(1000);
 
 	// Call the Arbiter
-	Arbiter(45);
+	//Arbiter(45);
 
-	StopAllTasks();
-	return;
+	park(8, 8);
+	set_steering_angle(0);
+	//StopAllTasks();
+	//return;
 }

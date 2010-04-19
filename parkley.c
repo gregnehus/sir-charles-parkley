@@ -15,12 +15,12 @@
 #define SONAR_THRESHOLD 200
 
 // steer motor
-#define STEER_VALUE_LEFTMOST 0
-#define STEER_VALUE_RIGHTMOST 90
-#define STEER_SPEED 50
+#define STEER_VALUE_LEFTMOST -45
+#define STEER_VALUE_RIGHTMOST 45
+#define STEER_SPEED 20
 
 // drive motor
-#define DRIVE_SPEED 50
+#define DRIVE_SPEED 60
 
 // PID
 #define PID_Ki 1.0
@@ -28,6 +28,13 @@
 #define PID_INTEGRAL_MAX 999999
 #define PID_INTEGRAL_MIN -999999
 
+//Car info
+#define track 4.625
+#define wheelbase 7.25
+
+#define WHEEL_DIAMETER 5.5
+#define turning_radius 13.6
+//#define turning_radius 14.56
 /**********************************************************************************
 * Global variables
 **********************************************************************************/
@@ -44,7 +51,7 @@ float prevError = 0.0;
 float error = 0.0;
 
 // Steer motor
-int steeringAngle = (STEER_VALUE_LEFTMOST + STEER_VALUE_RIGHTMOST) / 2; //this requires initial steering angle to be straigh ahead
+int steeringAngle = 0;//(STEER_VALUE_LEFTMOST + STEER_VALUE_RIGHTMOST) / 2; //this requires initial steering angle to be straigh ahead
 
 // Park
 bool isParking = false;
@@ -54,9 +61,14 @@ bool isParking = false;
 * Function prototypes
 **********************************************************************************/
 float GetPID(float fError);
-void Park();
 void SetSteeringAngle(int targetAngle);
+void park(float deltaX, float deltaY);
 
+float inches_to_centimeters(float inches);
+void drive(float distance);
+float get_angle_between_circles(float deltaX, float deltaY);
+float get_distance(float deltaX, float deltaY);
+float get_needed_park_y_coordinate(float deltaX);
 
 /**********************************************************************************
 * Light sensor thread
@@ -119,6 +131,8 @@ task main()
 	Kp = (STEER_VALUE_LEFTMOST - STEER_VALUE_RIGHTMOST) / (LIGHT_VALUE_CARPET - LIGHT_VALUE_TAPE);
 	integral = 0;
 
+	park(5,0);
+	while(1);
 	// start sonar sensor
 	StartTask(tSonarSensor);
 	wait1Msec(1000);
@@ -135,7 +149,7 @@ task main()
 	}
 
 	// perform parallel parking
-	Park();
+	//Park();
 
 }
 
@@ -174,10 +188,7 @@ float GetPID(float fError)
 * Return: None
 * Description: This function performs parallel parking.
 **********************************************************************************/
-void Park()
-{
-	return;
-}
+
 
 /**********************************************************************************
 * Function: void SetSteeringAngle()
@@ -202,13 +213,13 @@ void SetSteeringAngle(int targetAngle)
   {
     // left turn case
     direction = -1;
-    targetMotorEncoderValue = steeringAngle - targetAngle;
+    targetMotorEncoderValue = steeringAngle - targetAngle + 6;
   }
   else
   {
     // right turn case
     direction = 1;
-    targetMotorEncoderValue = targetAngle - steeringAngle;
+    targetMotorEncoderValue = targetAngle - steeringAngle ;
   }
 
 	// reset motor encoder value and set motor speeds
@@ -216,10 +227,90 @@ void SetSteeringAngle(int targetAngle)
 	motor[steerMotor] = STEER_SPEED * direction;
 
 	// wait for desired motor encoder value
-	while( abs(nMotorEncoder[steerMotor]) <= targetMotorEncoderValue );
+	while( abs(nMotorEncoder[steerMotor]) <= (int)(targetMotorEncoderValue ) );
 
 	// stop motor and return
 	steeringAngle = targetAngle;
 	motor[steerMotor] = 0;
+	wait10Msec(10);
 	return;
+}
+
+void park(float deltaX, float deltaY){
+   float currentTurningCircleOrigin_X,currentTurningCircleOrigin_Y;
+   float parkedTurningCircleOrigin_X, parkedTurningCircleOrigin_Y;
+
+   currentTurningCircleOrigin_X = turning_radius - track/2;
+   currentTurningCircleOrigin_Y = 0;
+
+   parkedTurningCircleOrigin_X = deltaX - turning_radius + track/2;
+   currentTurningCircleOrigin_Y = deltaY;
+
+   float circleDeltaX = parkedTurningCircleOrigin_X - currentTurningCircleOrigin_X;
+   float nX = get_needed_park_y_coordinate(circleDeltaX);
+   //double nCarx = nX
+   nxtDisplayCenteredTextLine(4, "needed dX=%f", nX);
+   //while(1);
+   drive(inches_to_centimeters(nX - deltaY + wheelbase));
+  int x;
+
+
+
+
+   /*
+   SetSteeringAngle(0);
+   while(1){
+     SetSteeringAngle(45);
+     wait10Msec(100);
+     SetSteeringAngle(-45);
+     wait10Msec(100);
+     SetSteeringAngle(0);
+     wait10Msec(100);
+
+   }
+   */
+   SetSteeringAngle(45);
+
+   //float turningRadius = getTurningRadius();
+   //nxtDisplayCenteredTextLine(4, "radius=%d", turningRadius);
+   //while(1);
+   //drive(inches_to_centimeters(turning_radius * PI * 2));
+
+   //while(1);
+   drive(inches_to_centimeters(turning_radius * get_angle_between_circles(deltaY + nX,circleDeltaX)));
+
+   SetSteeringAngle(-45);
+   drive( inches_to_centimeters( turning_radius * ( get_angle_between_circles( deltaY + nX,circleDeltaX))));
+   //drive(- turning_radius * get_angle_between_circles(deltaX, deltaY));
+
+}
+
+float get_angle_between_circles(float deltaX, float deltaY){
+
+  return 2.0 * atan((sqrt((deltaX * deltaX) + (deltaY * deltaY)) - deltaX)/ deltaY);
+}
+
+
+void drive(float distance){
+
+  nMotorEncoder[motorA] = 0;
+  motor[motorA] =  (abs((int)distance)/(int)distance) * 40;
+
+  while (abs(nMotorEncoder[motorA]) < (long)abs(distance / (PI * WHEEL_DIAMETER) * 360.00));
+  motor[motorA] = 0;
+
+
+
+}
+float get_distance(float deltaX, float deltaY){
+    return sqrt( deltaX * deltaX + deltaY * deltaY);
+}
+
+float get_needed_park_y_coordinate(float deltaX){
+  float distance = ((turning_radius * 2) - track) * ((turning_radius * 2) - track);
+   return sqrt( distance   - (deltaX * deltaX));
+}
+
+float inches_to_centimeters(float inches){
+  return inches * 2.54;
 }
