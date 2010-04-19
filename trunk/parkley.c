@@ -22,6 +22,11 @@
 // drive motor
 #define DRIVE_SPEED 50
 
+// PID
+#define PID_Ki 1.0
+#define PID_Kd 100
+#define PID_INTEGRAL_MAX 999999
+#define PID_INTEGRAL_MIN -999999
 
 /**********************************************************************************
 * Global variables
@@ -30,6 +35,10 @@
 float Kp;     //the Konstant for the proportional controller
 float Tp;     //the Target steering angle (straight)
 float offset; //average of the tape and carpet readings
+float Ki = PID_Ki;
+float integral = 0.0;
+float Kd = PID_Kd;
+float prevError = 0.0;
 
 // Light sensor
 float error = 0.0;
@@ -44,7 +53,7 @@ bool isParking = false;
 /**********************************************************************************
 * Function prototypes
 **********************************************************************************/
-int GetPID();
+float GetPID(float fError);
 void Park();
 void SetSteeringAngle(int targetAngle);
 
@@ -87,7 +96,7 @@ task tSonarSensor()
 		// take a sensor reading
 		SonarValue = SensorValue(lightSensor);
 
-		// TODO: if(adequate parking space is found), then set isParking flag to true
+		// TODO: if(adequate parking space is found), then set isParking flag to true (kills line-following)
 	}
 
 	return;
@@ -108,6 +117,7 @@ task main()
 	offset = (LIGHT_VALUE_CARPET + LIGHT_VALUE_TAPE) / 2;
 	Tp = (STEER_VALUE_LEFTMOST + STEER_VALUE_RIGHTMOST) / 2;
 	Kp = (STEER_VALUE_LEFTMOST - STEER_VALUE_RIGHTMOST) / (LIGHT_VALUE_CARPET - LIGHT_VALUE_TAPE);
+	integral = 0;
 
 	// start sonar sensor
 	StartTask(tSonarSensor);
@@ -120,7 +130,7 @@ task main()
 	// perform line-following
 	while(!isParking)
 	{
-	  controllerOutput = GetPID();
+	  controllerOutput = GetPID(error);
 	  SetSteeringAngle(Tp + controllerOutput);
 	}
 
@@ -131,22 +141,31 @@ task main()
 
 /**********************************************************************************
 * Function: float GetPID()
-* Parameters: None
+* Parameters: takes the current error reading as its only argument
 * Return: None
 * Description: This method returns the PID output (a steering angle adjustment)
 **********************************************************************************/
-float GetPID()
+float GetPID(float fError)
 {
   float pTerm = 0.0, dTerm = 0.0, iTerm = 0.0;
 
   // [p]roportional term calculations
-  pTerm = Kp * error;
+  pTerm = Kp * fError;
 
   // [i]ntegral term calculations
+  integral = integral + fError;
+	if (integral > PID_INTEGRAL_MAX)
+	  integral = PID_INTEGRAL_MAX;
+	else
+	  if (integral < PID_INTEGRAL_MIN)
+	    integral = PID_INTEGRAL_MIN;
+  iTerm = Ki * integral;
 
   // [d]erivative term calculations
+  dTerm = Kd * (fError - prevError);
+  prevError = fError;
 
-	return (pTerm + iTerm - dTerm);
+	return (pTerm + iTerm + dTerm);
 }
 
 /**********************************************************************************
