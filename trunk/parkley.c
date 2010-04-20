@@ -8,23 +8,30 @@
 * Tweakable macros
 **********************************************************************************/
 // light sensor
-#define LIGHT_VALUE_CARPET 68
-#define LIGHT_VALUE_TAPE 48
+#define LIGHT_VALUE_CARPET 30
+#define LIGHT_VALUE_TAPE 60
 
 // sonar sensor
 #define SONAR_THRESHOLD 200
 
 // steer motor
-#define STEER_VALUE_LEFTMOST -45
-#define STEER_VALUE_RIGHTMOST 45
-#define STEER_SPEED 20
+#define STEER_VALUE_LEFTMOST 0
+#define STEER_VALUE_RIGHTMOST 90
+#define STEER_SPEED 75
 
 // drive motor
-#define DRIVE_SPEED 60
+#define DRIVE_SPEED 100
 
 // PID
-#define PID_Ki 1.0
-#define PID_Kd 100
+#define PID_dT 0.015
+#define PID_Pc 3
+
+#define PID_Kp 0.5
+//#define PID_Ki (2 * PID_Kp * PID_dT / PID_Pc)
+#define PID_Ki 0.0
+//#define PID_Kd (PID_Kp * PID_Pc / (8 * PID_dT))
+#define PID_Kd 0.0026
+
 #define PID_INTEGRAL_MAX 999999
 #define PID_INTEGRAL_MIN -999999
 
@@ -39,7 +46,7 @@
 * Global variables
 **********************************************************************************/
 // PID
-float Kp;     //the Konstant for the proportional controller
+float Kp = PID_Kp;     //the Konstant for the proportional controller
 float Tp;     //the Target steering angle (straight)
 float offset; //average of the tape and carpet readings
 float Ki = PID_Ki;
@@ -51,7 +58,7 @@ float prevError = 0.0;
 float error = 0.0;
 
 // Steer motor
-int steeringAngle = 0;//(STEER_VALUE_LEFTMOST + STEER_VALUE_RIGHTMOST) / 2; //this requires initial steering angle to be straigh ahead
+int steeringAngle = 45;//(STEER_VALUE_LEFTMOST + STEER_VALUE_RIGHTMOST) / 2; //this requires initial steering angle to be straigh ahead
 
 // Park
 bool isParking = false;
@@ -83,11 +90,13 @@ task tLightSensor()
 	{
 	  // delay 3 milliseconds since that's about the fastest the light sensor can read
 		wait1Msec(3);
+		wait1MSec(100);
 
 		// take a sensor reading and calculate the error by subtracting the offset
 		LightValue = SensorValue(lightSensor);
-		nxtDisplayCenteredBigTextLine(1, "S4=%d", LightValue);
 		error = LightValue - offset;
+		//nxtDisplayTextLine(1, "S4=%d", LightValue);
+		//nxtDisplayTextLine(3, "error=%d", error);
 	}
 	return;
 }
@@ -106,7 +115,8 @@ task tSonarSensor()
 		wait1Msec(15);
 
 		// take a sensor reading
-		SonarValue = SensorValue(lightSensor);
+		SonarValue = SensorValue(sonarSensor);
+		nxtDisplayCenteredBigTextLine(3, "S1=%d", SonarValue);
 
 		// TODO: if(adequate parking space is found), then set isParking flag to true (kills line-following)
 	}
@@ -128,11 +138,11 @@ task main()
 	// initialize values of PID globals
 	offset = (LIGHT_VALUE_CARPET + LIGHT_VALUE_TAPE) / 2;
 	Tp = (STEER_VALUE_LEFTMOST + STEER_VALUE_RIGHTMOST) / 2;
-	Kp = (STEER_VALUE_LEFTMOST - STEER_VALUE_RIGHTMOST) / (LIGHT_VALUE_CARPET - LIGHT_VALUE_TAPE);
+	//Kp = 0.5;//(STEER_VALUE_LEFTMOST - STEER_VALUE_RIGHTMOST) / (LIGHT_VALUE_CARPET - LIGHT_VALUE_TAPE);
 	integral = 0;
 
-	park(5,0);
-	while(1);
+	//park(5,0);
+	//while(1);
 	// start sonar sensor
 	StartTask(tSonarSensor);
 	wait1Msec(1000);
@@ -141,10 +151,14 @@ task main()
 	StartTask(tLightSensor);
 	wait1Msec(1000);
 
+	// drive
+	motor[driveMotor] = DRIVE_SPEED;
+
 	// perform line-following
 	while(!isParking)
 	{
 	  controllerOutput = GetPID(error);
+	  //nxtDisplayTextLine(5, "PID=%d", controllerOutput);
 	  SetSteeringAngle(Tp + controllerOutput);
 	}
 
@@ -152,6 +166,16 @@ task main()
 	//Park();
 
 }
+
+
+
+
+
+
+
+
+
+
 
 /**********************************************************************************
 * Function: float GetPID()
@@ -200,7 +224,7 @@ void SetSteeringAngle(int targetAngle)
 {
   int targetMotorEncoderValue;
   int direction;
-  nxtDisplayCenteredBigTextLine(5, "target=%d", targetAngle);
+  //nxtDisplayTextLine(7, "steer=%d", targetAngle);
 
   // error-handling
   if(targetAngle < STEER_VALUE_LEFTMOST) targetAngle = STEER_VALUE_LEFTMOST;
@@ -213,7 +237,8 @@ void SetSteeringAngle(int targetAngle)
   {
     // left turn case
     direction = -1;
-    targetMotorEncoderValue = steeringAngle - targetAngle + 6;
+    targetMotorEncoderValue = steeringAngle - targetAngle;
+    if(isParking) targetMotorEncoderValue = targetMotorEncoderValue + 6;
   }
   else
   {
@@ -232,7 +257,7 @@ void SetSteeringAngle(int targetAngle)
 	// stop motor and return
 	steeringAngle = targetAngle;
 	motor[steerMotor] = 0;
-	wait10Msec(10);
+	//wait1Msec(10);
 	return;
 }
 
