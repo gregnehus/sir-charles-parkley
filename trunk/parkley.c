@@ -265,6 +265,7 @@ void park(float deltaX, float deltaY){
    float currentTurningCircleOrigin_X,currentTurningCircleOrigin_Y;
    float parkedTurningCircleOrigin_X, parkedTurningCircleOrigin_Y;
 
+   deltaX = deltaX + track/2.0 ;
    currentTurningCircleOrigin_X = turning_radius - track/2;
    currentTurningCircleOrigin_Y = 0;
 
@@ -274,9 +275,9 @@ void park(float deltaX, float deltaY){
    float circleDeltaX = parkedTurningCircleOrigin_X - currentTurningCircleOrigin_X;
    float nX = get_needed_park_y_coordinate(circleDeltaX);
    //double nCarx = nX
-   nxtDisplayCenteredTextLine(4, "needed dX=%f", nX);
+
    //while(1);
-   drive(inches_to_centimeters(nX - deltaY + wheelbase));
+   drive(inches_to_centimeters(nX - deltaY));
   int x;
 
 
@@ -294,7 +295,7 @@ void park(float deltaX, float deltaY){
 
    }
    */
-   SetSteeringAngle(45);
+   SetSteeringAngle(90);
 
    //float turningRadius = getTurningRadius();
    //nxtDisplayCenteredTextLine(4, "radius=%d", turningRadius);
@@ -302,24 +303,27 @@ void park(float deltaX, float deltaY){
    //drive(inches_to_centimeters(turning_radius * PI * 2));
 
    //while(1);
-   drive(inches_to_centimeters(turning_radius * get_angle_between_circles(deltaY + nX,circleDeltaX)));
+   float angleBetweenCircle = get_angle_between_circles(circleDeltaX,deltaY + nX);
 
-   SetSteeringAngle(-45);
-   drive( inches_to_centimeters( turning_radius * ( get_angle_between_circles( deltaY + nX,circleDeltaX))));
+   nxtDisplayCenteredTextLine(4, "angle= %f", angleBetweenCircle);
+   drive(inches_to_centimeters(turning_radius * angleBetweenCircle));
+
+   SetSteeringAngle(0);
+   drive( inches_to_centimeters( turning_radius * (angleBetweenCircle) )+  wheelbase);
    //drive(- turning_radius * get_angle_between_circles(deltaX, deltaY));
-
+  StartTask(we_are_the_champions);
 }
 
 float get_angle_between_circles(float deltaX, float deltaY){
 
-  return 2.0 * atan((sqrt((deltaX * deltaX) + (deltaY * deltaY)) - deltaX)/ deltaY);
+    return atan(deltaY/deltaX);
 }
 
 
 void drive(float distance){
 
   nMotorEncoder[motorA] = 0;
-  motor[motorA] =  (abs((int)distance)/(int)distance) * 40;
+  motor[motorA] =  (abs((int)distance)/(int)distance) * DRIVE_SPEED;
 
   while (abs(nMotorEncoder[motorA]) < (long)abs(distance / (PI * WHEEL_DIAMETER) * 360.00));
   motor[motorA] = 0;
