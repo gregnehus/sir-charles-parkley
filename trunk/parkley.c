@@ -58,6 +58,7 @@ int SonarValue;
 
 // Park
 bool isParking = false;
+bool isOffTape;
 
 
 /**********************************************************************************
@@ -71,6 +72,7 @@ void drive(float distance, int leftSpeed, int rightSpeed);
 float get_angle_between_circles(float deltaX, float deltaY);
 float get_needed_park_y_coordinate(float deltaX);
 float distanceFromWall = 0;
+void turn_around();
 //float get_distance(float deltaX, float deltaY);
 
 /**********************************************************************************
@@ -156,6 +158,14 @@ task main()
 	while(!isParking)
 	{
 	  controllerOutput = GetPID(error);
+
+	  if (isOffTape){
+	     turn_around();
+	     drive(10, 50,50);
+	     integral = 0;
+	     isOffTape = false;
+
+	  }
 	  nxtDisplayTextLine(5, "L=%f", Tp + controllerOutput);
 	  nxtDisplayTextLine(7, "R=%f", Tp - controllerOutput);
 	  motor[leftMotor] = (int) (Tp + controllerOutput);
@@ -171,6 +181,16 @@ task main()
 
 
 /**********************************************************************************
+* Function: void turn_around()
+* Parameters: none
+* Return: None
+* Description: Turns around
+**********************************************************************************/
+void turn_around(){
+
+  drive(5.5, -100, 100);
+}
+/**********************************************************************************
 * Function: float GetPID()
 * Parameters: takes the current error reading as its only argument
 * Return: None
@@ -185,6 +205,7 @@ float GetPID(float fError)
 
   // [i]ntegral term calculations
   integral = integral + fError;
+  if (integral <= PID_INTEGRAL_MIN) isOffTape = true;
 	if (integral > PID_INTEGRAL_MAX)
 	  integral = PID_INTEGRAL_MAX;
 	else
