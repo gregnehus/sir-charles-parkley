@@ -128,7 +128,7 @@ task tSonarSensor()
 		  //nxtDisplayCenteredBigTextLine(3, "boom=%d", abs(nMotorEncoder[motorA]));
 
 		  if (abs(nMotorEncoder[motorA]) >= (long)(inches_to_centimeters(wheelbase)  / (PI * WHEEL_DIAMETER * 2/3 ) * 360.0 )   ){
-		    //isParking = true;
+		    isParking = true;
 		  };
 
 		  //(long)abs(distance / (PI * WHEEL_DIAMETER) * 360.00)
