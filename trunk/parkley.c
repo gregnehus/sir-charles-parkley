@@ -22,13 +22,11 @@
 
 // PID
 #define OFFSET_TWEAK 0
+#define PID_Tp 80.0
 #define PID_Kp (0.6 * PID_Kc)
 //#define PID_Ki 0.143
 #define PID_Ki (2 * PID_Kp * PID_dT / PID_Pc)
-//#define PID_Ki 0.0
 #define PID_Kd (PID_Kp * PID_Pc / (8 * PID_dT))
-//#define PID_Kd 5
-//#define PID_Kd 0.0
 
 #define PID_INTEGRAL_MAX 500
 #define PID_INTEGRAL_MIN -500
@@ -45,7 +43,7 @@
 **********************************************************************************/
 // PID
 float Kp = PID_Kp;     //the Konstant for the proportional controller
-float Tp = 80.0;     //the Target steering angle (straight)
+float Tp = PID_Tp;     //the Target steering angle (straight)
 float offset; //average of the tape and carpet readings
 float Ki = PID_Ki;
 float integral = 0.0;
@@ -57,9 +55,6 @@ float error = 0.0;
 
 // Sonar sensor
 int SonarValue;
-
-// Steer motor
-int steeringAngle = 45;//(STEER_VALUE_LEFTMOST + STEER_VALUE_RIGHTMOST) / 2; //this requires initial steering angle to be straight ahead
 
 // Park
 bool isParking = false;
@@ -97,8 +92,6 @@ task tLightSensor()
 		error = LightValue - offset;
 		nxtDisplayTextLine(1, "S4=%d", LightValue);
 		nxtDisplayTextLine(3, "error=%f", error);
-
-		//wait1Msec(3000);
 	}
 	return;
 }
@@ -110,21 +103,18 @@ task tSonarSensor()
 {
 	nSchedulePriority = kDefaultTaskPriority;
 
-
 	while(!isParking)
 	{
-
-
 	  // delay 15 milliseconds since that's about the fastest the sonar sensor can read
 		wait1Msec(15);
 
 		// take a sensor reading
-		SonarValue = SensorValue(sonarSensor);
+		SonarValue = SensorValue[sonarSensor];
 
 		if (distanceFromWall == 0) distanceFromWall = SonarValue;
 		nMotorEncoder[motorA] = 0;
-		while (SensorValue(sonarSensor) >= distanceFromWall + track){
-		  nxtDisplayCenteredBigTextLine(3, "boom=%d", abs(nMotorEncoder[motorA]));
+		while(SensorValue[sonarSensor] >= distanceFromWall + track)
+		{
 		  //nxtDisplayCenteredBigTextLine(3, "boom=%d", abs(nMotorEncoder[motorA]));
 
 		  if (abs(nMotorEncoder[motorA]) >= (long)(inches_to_centimeters(wheelbase)  / (PI * WHEEL_DIAMETER * 2/3 ) * 360.0 )   ){
@@ -144,24 +134,13 @@ task tSonarSensor()
 **********************************************************************************/
 task main()
 {
+  nSchedulePriority = kDefaultTaskPriority;
+
   int controllerOutput;
-
-	nSchedulePriority = kDefaultTaskPriority;
-
-	// setup motors
-	//bFloatDuringInactiveMotorPWM = false;
-	//nMaxRegulatedSpeedNxt = 2160;
-	//nPidUpdateInterval = 1;
-	//nMotorPIDSpeedCtrl[leftMotor] = mtrSpeedReg;
-	//nMotorPIDSpeedCtrl[rightMotor] = mtrSpeedReg;
-
 	eraseDisplay();
 
 	// initialize values of PID globals
 	offset = ((LIGHT_VALUE_CARPET + LIGHT_VALUE_TAPE) / 2) + OFFSET_TWEAK;
-
-
-
 
   // start sonar sensor
 	StartTask(tSonarSensor);
@@ -185,14 +164,7 @@ task main()
 
 	// perform parallel parking
 	park(distanceFromWall/2.54 + track, 2);
-
 }
-
-
-
-
-
-
 
 
 
@@ -225,12 +197,6 @@ float GetPID(float fError)
   prevError = fError;
 
 	return (pTerm + iTerm + dTerm);
-}
-
-
-void SetSteeringAngle(int targetAngle)
-{
-  return;
 }
 
 
@@ -282,29 +248,33 @@ float get_angle_between_circles(float deltaX, float deltaY){
 
 void drive(float distance, int leftSpeed, int rightSpeed)
 {
-  nMotorEncoder[motorA] = 0;
-  nMotorEncoder[motorC] = 0;
-  motor[motorA] =  leftSpeed;
-  motor[motorC] = rightSpeed;
+  nMotorEncoder[leftMotor] = 0;
+  nMotorEncoder[rightMotor] = 0;
+  motor[leftMotor] =  leftSpeed;
+  motor[rightMotor] = rightSpeed;
 
-  while (1){
-    if (leftSpeed > rightSpeed){
-     if (abs(nMotorEncoder[motorA]) > (long)abs(distance / (PI * WHEEL_DIAMETER) * 360.00)) break;
+	while (1)
+	{
+	  // check bumper sensor
+		if (SensorValue[bumperSensor] == 1) PlaySound(soundBeepBeep);
 
-   }else{
-     if (abs(nMotorEncoder[motorC]) > (long)abs(distance / (PI * WHEEL_DIAMETER) * 360.00)) break;
-   }
-  }
+		// check motor encoder values
+		if (leftSpeed > rightSpeed)
+		{
+			if (abs(nMotorEncoder[leftMotor]) > (long)abs(distance / (PI * WHEEL_DIAMETER) * 360.00)) break;
+		}else{
+			if (abs(nMotorEncoder[rightMotor]) > (long)abs(distance / (PI * WHEEL_DIAMETER) * 360.00)) break;
+		}
+	}
 
-
-  motor[motorA] = 0;
-  motor[motorC] = 0;
+  motor[leftMotor] = 0;
+  motor[rightMotor] = 0;
 }
 
 float get_needed_park_y_coordinate(float deltaX)
 {
   float distance = ((turning_radius * 2) - track) * ((turning_radius * 2) - track);
-  return sqrt( distance   - (deltaX * deltaX));
+  return sqrt( distance - (deltaX * deltaX) );
 }
 
 float inches_to_centimeters(float inches){
