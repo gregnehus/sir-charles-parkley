@@ -31,9 +31,11 @@ const tMotor motorB = (tMotor) motorB; //tmotorNxtEncoderClosedLoop //*!!!!*//
 /**********************************************************************************
 * Preprocessor Definitions
 *********************************************************************************/
-#define TARGET_LIGHT_VALUE 30
-#define MOTOR_A_SPEED -15
-#define MOTOR_B_SPEED 75
+#define MIN_LIGHT_VALUE 48
+#define MAX_LIGHT_VALUE 68
+#define TARGET_LIGHT_VALUE (MIN_LIGHT_VALUE+((MAX_LIGHT_VALUE-MIN_LIGHT_VALUE)/2))
+#define MOTOR_A_SPEED -10
+#define MOTOR_B_SPEED 50
 
 #define track 4.625
 #define wheelbase 7.25
@@ -90,9 +92,11 @@ task tLightSensor()
 
 		// take a reading and calculate the error
 		nLight = SensorValue(LightSensor);
-		nxtDisplayCenteredBigTextLine(2, "S4=%d", nLight);
-		fError = (TARGET_LIGHT_VALUE - nLight);
+		nxtDisplayCenteredBigTextLine(1, "S4=%d", nLight);
+		fError = (nLight - TARGET_LIGHT_VALUE);
 		if (fError > fsError) fsError = fError;
+
+		wait1Msec(500);
 	}
 	return;
 }
@@ -107,7 +111,7 @@ float UpdatePID(int x, float error, float position)
 	pTerm = pGain[x] * error;
 	// calculate the proportional term
 	// calculate the integral state with appropriate limiting
-	iState[x] += error;
+	iState[x] = iState[x] + error;
 	if (iState[x] > iMax[x])
 	  iState[x] = iMax[x];
 	else
@@ -125,7 +129,7 @@ float UpdatePID(int x, float error, float position)
 *********************************************************************************/
 void Arbiter(int nAngle)
 {
-	int outputAngle = 0;
+	int outputPID;
 
 	// Initialize the motors
 	bFloatDuringInactiveMotorPWM = false;
@@ -154,11 +158,13 @@ void Arbiter(int nAngle)
 		// call the PID controller
 		if (fError != 0.0)
 		{
-			outputAngle = nAngle - (int) UpdatePID(0,abs(fError),abs(fError));
-			if (outputAngle > nAngle) outputAngle = nAngle;
-			if (outputAngle < 0) outputAngle = 0;
-			if (outputAngle > 90) outputAngle = 90;
-			set_steering_angle(outputAngle);
+			outputPID = 90 - (int) UpdatePID(0,abs(fError),abs(fError));//nAngle - (int) UpdatePID(0,abs(fError),abs(fError));
+			nxtDisplayCenteredBigTextLine(3, "PID=%d", outputPID);
+
+			if (outputPID < 0) outputPID = 0;
+			if (outputPID > 90) outputPID = 90;
+
+			//set_steering_angle(outputPID);
 			wait1Msec(1.0);
 		}
 	}
@@ -255,7 +261,18 @@ void set_steering_angle(int angle)
 {
   int direction = 1;
 
+<<<<<<< .mine
+  nxtDisplayCenteredBigTextLine(5, "angle=%d", angle);
+=======
   //nxtDisplayCenteredBigTextLine(4, "angle=%d", angle);
+>>>>>>> .r9
+
+  if(angle == 45) return;
+  if(angle<45)
+    motor[motorB] = MOTOR_B_SPEED * -1;
+  else
+    motor[motorB] = MOTOR_B_SPEED * 1;
+  return;
 
   // base case
   if(angle == steeringAngle) return;
