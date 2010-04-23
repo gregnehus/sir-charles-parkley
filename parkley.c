@@ -12,9 +12,6 @@
 #define LIGHT_VALUE_CARPET 58
 #define LIGHT_VALUE_TAPE 34
 
-// drive motor
-#define DRIVE_SPEED 100
-
 // PID tuning
 #define PID_dT 0.002
 #define PID_Pc 0.5
@@ -71,7 +68,7 @@ float inches_to_centimeters(float inches);
 void drive(float distance, int leftSpeed, int rightSpeed);
 float get_angle_between_circles(float deltaX, float deltaY);
 float get_needed_park_y_coordinate(float deltaX);
-float distanceFromWall = 0;
+int distanceFromWall = 0;
 void turn_around();
 //float get_distance(float deltaX, float deltaY);
 
@@ -92,8 +89,8 @@ task tLightSensor()
 		// take a sensor reading and calculate the error by subtracting the offset
 		LightValue = SensorValue(lightSensor);
 		error = LightValue - offset;
-		nxtDisplayTextLine(1, "S4=%d", LightValue);
-		nxtDisplayTextLine(3, "error=%f", error);
+		//nxtDisplayTextLine(1, "S4=%d", LightValue);
+		//nxtDisplayTextLine(3, "error=%f", error);
 	}
 	return;
 }
@@ -113,19 +110,26 @@ task tSonarSensor()
 		// take a sensor reading
 		SonarValue = SensorValue[sonarSensor];
 
+
 		if (distanceFromWall == 0) distanceFromWall = SonarValue;
 		nMotorEncoder[motorA] = 0;
-		while(SensorValue[sonarSensor] >= distanceFromWall + track)
+		//nxtDisplayCenteredTextLine(1,"Distance %d", distanceFromWall);
+		while(SensorValue[sonarSensor] >= distanceFromWall + track * 2.54)
 		{
 		  //nxtDisplayCenteredBigTextLine(3, "boom=%d", abs(nMotorEncoder[motorA]));
 
 		  if (abs(nMotorEncoder[motorA]) >= (long)(inches_to_centimeters(wheelbase)  / (PI * WHEEL_DIAMETER * 2/3 ) * 360.0 )   ){
 		    isParking = true;
+		    break;
+
 		  };
 
 		  //(long)abs(distance / (PI * WHEEL_DIAMETER) * 360.00)
 		}
+		if (!isParking)distanceFromWall = SonarValue;
+		//nxtDisplayCenteredTextLine(1,"Distance %d", distanceFromWall);
 	}
+
 
 	return;
 }
@@ -137,6 +141,7 @@ task tSonarSensor()
 task main()
 {
   nSchedulePriority = kDefaultTaskPriority;
+  nVolume = 4;
 
   int controllerOutput;
 	eraseDisplay();
@@ -160,20 +165,25 @@ task main()
 	  controllerOutput = GetPID(error);
 
 	  if (isOffTape){
+	    /*
 	     turn_around();
 	     drive(10, 50,50);
 	     integral = 0;
 	     isOffTape = false;
+	     */
 
 	  }
-	  nxtDisplayTextLine(5, "L=%f", Tp + controllerOutput);
-	  nxtDisplayTextLine(7, "R=%f", Tp - controllerOutput);
+	  //nxtDisplayTextLine(5, "L=%f", Tp + controllerOutput);
+	  //nxtDisplayTextLine(7, "R=%f", Tp - controllerOutput);
 	  motor[leftMotor] = (int) (Tp + controllerOutput);
 	  motor[rightMotor] = (int) (Tp - controllerOutput);
 	}
 
 	// perform parallel parking
-	park(distanceFromWall/2.54 + track, 2);
+	park((distanceFromWall/2.54)/2 , 1);
+
+	// wait (in case sound needs to finish playing)
+	wait1Msec(5000);
 }
 
 
@@ -187,9 +197,10 @@ task main()
 * Description: Turns around
 **********************************************************************************/
 void turn_around(){
-
   drive(5.5, -100, 100);
 }
+
+
 /**********************************************************************************
 * Function: float GetPID()
 * Parameters: takes the current error reading as its only argument
@@ -213,6 +224,8 @@ float GetPID(float fError)
 	    integral = PID_INTEGRAL_MIN;
   iTerm = Ki * integral;
 
+  nxtDisplayCenteredBigTextLine(3, "i=%f", integral);
+
   // [d]erivative term calculations
   dTerm = Kd * (fError - prevError);
   prevError = fError;
@@ -230,8 +243,9 @@ float GetPID(float fError)
 void park(float deltaX, float deltaY){
    float currentTurningCircleOrigin_X, currentTurningCircleOrigin_Y;
    float parkedTurningCircleOrigin_X, parkedTurningCircleOrigin_Y;
-
-   deltaX = deltaX + track ;
+    eraseDisplay();
+    //nxtDisplayCenteredTextLine(3, "%f, %f", deltaX, deltaY);
+   deltaX = deltaX  ;
    currentTurningCircleOrigin_X = turning_radius - track/2;
    currentTurningCircleOrigin_Y = 0;
 
@@ -255,7 +269,7 @@ void park(float deltaX, float deltaY){
    //drive( inches_to_centimeters( turning_radius * (angleBetweenCircle) )+  wheelbase);
    drive(inches_to_centimeters(turning_radius * angleBetweenCircle), -60,-20);
 
-   drive(inches_to_centimeters(turning_radius * angleBetweenCircle ) - 4, -20,-60);
+   drive(inches_to_centimeters(turning_radius * angleBetweenCircle ) + 2, -20,-60);
 
 
    //drive(- turning_radius * get_angle_between_circles(deltaX, deltaY));
@@ -277,11 +291,14 @@ void drive(float distance, int leftSpeed, int rightSpeed)
 	while (1)
 	{
 	  // check bumper sensor
-		if (SensorValue[bumperSensor] == 1) PlaySound(soundBeepBeep);
+		if (SensorValue[bumperSensor] == 1)
+		{
+		  PlaySound(soundDownwardTones);
+		  break;
+		}
 
 		// check motor encoder values
-		if (leftSpeed > rightSpeed)
-		{
+		if (leftSpeed > rightSpeed){
 			if (abs(nMotorEncoder[leftMotor]) > (long)abs(distance / (PI * WHEEL_DIAMETER) * 360.00)) break;
 		}else{
 			if (abs(nMotorEncoder[rightMotor]) > (long)abs(distance / (PI * WHEEL_DIAMETER) * 360.00)) break;
