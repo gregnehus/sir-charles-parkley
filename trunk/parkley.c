@@ -22,11 +22,11 @@
 #define PID_Tp 80.0
 #define PID_Kp (0.6 * PID_Kc)
 //#define PID_Ki 0.143
-#define PID_Ki (2 * PID_Kp * PID_dT / PID_Pc)
+#define PID_Ki (0.5 * 2 * PID_Kp * PID_dT / PID_Pc)
 #define PID_Kd (PID_Kp * PID_Pc / (8 * PID_dT))
 
-#define PID_INTEGRAL_MAX 500
-#define PID_INTEGRAL_MIN -500
+#define PID_INTEGRAL_MAX 2500
+#define PID_INTEGRAL_MIN -2500
 
 //Car info
 #define track 4.625
