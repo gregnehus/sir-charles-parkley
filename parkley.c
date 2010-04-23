@@ -165,12 +165,12 @@ task main()
 	  controllerOutput = GetPID(error);
 
 	  if (isOffTape){
-	    /*
+
 	     turn_around();
-	     drive(10, 50,50);
+	     distanceFromWall = 0;
 	     integral = 0;
 	     isOffTape = false;
-	     */
+
 
 	  }
 	  //nxtDisplayTextLine(5, "L=%f", Tp + controllerOutput);
@@ -197,7 +197,16 @@ task main()
 * Description: Turns around
 **********************************************************************************/
 void turn_around(){
-  drive(5.5, -100, 100);
+  motor[leftMotor] = 0;
+  motor[rightMotor] = 0;
+  wait10Msec(10);
+  motor[leftMotor] = -40;
+  motor[rightMotor] = 40;
+
+  while (error < -5);
+
+  motor[leftMotor] = 0;
+  motor[rightMotor] = 0;
 }
 
 
